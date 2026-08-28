@@ -1,0 +1,32 @@
+name: moco_generic
+seed: 0
+data: {_from_: configs/data/deepship.yaml}
+features: {_from_: configs/features/logmel.yaml}
+augment: {_from_: configs/augment/generic.yaml}
+moco:
+  backbone: resnet18
+  dim: 128
+  queue_size: 8192
+  momentum: 0.999
+  temperature: 0.2
+  mlp_hidden: 512
+  norm: splitbn
+optim:
+  optimizer: sgd
+  lr: 0.03
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  epochs: 200
+  warmup_epochs: 5
+  schedule: cosine
+  batch_size: 128
+demon_loss:
+  enabled: false
+  weight: 0.0
+wandb:
+  project: phase
+  mode: online
+  group: pretrain
+  tags: [moco, generic]
+checkpoint_dir: checkpoints/moco_generic
+checkpoint_every: 1

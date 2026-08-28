@@ -1,0 +1,14 @@
+name: finetune
+_from_: configs/eval/linear_probe.yaml
+protocol: finetune
+optim:
+  optimizer: sgd
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  epochs: 40
+  warmup_epochs: 2
+  schedule: cosine
+  batch_size: 128
+wandb:
+  tags: [finetune]

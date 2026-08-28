@@ -1,0 +1,8 @@
+name: cqt
+normalize: per_sample_zscore
+highpass_hz: 5.0
+cqt:
+  bins_per_octave: 30
+  n_bins: 180
+  fmin: 10.0
+  hop_length: 512

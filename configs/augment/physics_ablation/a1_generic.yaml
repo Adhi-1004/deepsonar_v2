@@ -1,0 +1,17 @@
+name: a1_generic
+family: generic
+ops:
+- name: random_crop
+  prob: 1.0
+  params:
+    seconds: 30.0
+- name: gain
+  prob: 0.8
+  params:
+    db_low: -6.0
+    db_high: 6.0
+- name: time_mask
+  prob: 0.5
+  params:
+    max_fraction: 0.1
+    n_masks: 2

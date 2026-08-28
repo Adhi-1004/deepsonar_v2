@@ -1,0 +1,20 @@
+name: linear_probe
+protocol: linear_probe
+seeds: [0, 1, 2]
+data: {_from_: configs/data/deepship.yaml}
+features: {_from_: configs/features/logmel.yaml}
+optim:
+  optimizer: adamw
+  lr: 1.0e-3
+  weight_decay: 0.0
+  epochs: 60
+  warmup_epochs: 3
+  schedule: cosine
+  batch_size: 256
+label_fractions: [1.0]
+leakage_control: true
+wandb:
+  project: phase
+  mode: online
+  group: eval
+  tags: [linear_probe]

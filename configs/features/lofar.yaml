@@ -1,0 +1,9 @@
+name: lofar
+normalize: per_sample_zscore
+highpass_hz: 5.0
+lofar:
+  frame_ms: 50.0
+  shift_ms: 25.0
+  window: hann
+  tpsw_length: 51
+  tpsw_gap: 8

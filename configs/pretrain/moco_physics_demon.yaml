@@ -1,0 +1,10 @@
+name: moco_physics_demon
+_from_: configs/pretrain/moco_physics.yaml
+demon_loss:
+  enabled: true
+  weight: 0.5
+  band_low: 1000.0
+  band_high: 30000.0
+wandb:
+  tags: [moco, physics, demon]
+checkpoint_dir: checkpoints/moco_physics_demon

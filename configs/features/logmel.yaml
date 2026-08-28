@@ -1,0 +1,11 @@
+name: logmel
+normalize: per_sample_zscore
+highpass_hz: 5.0
+logmel:
+  n_fft: 2048
+  hop_length: 512
+  n_mels: 128
+  fmin: 10.0
+  fmax: 8000.0
+  power: 2.0
+  log_offset: 1.0e-6

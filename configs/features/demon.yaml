@@ -1,0 +1,9 @@
+name: demon
+normalize: per_sample_zscore
+highpass_hz: 5.0
+demon:
+  band_low: 1000.0
+  band_high: 30000.0
+  envelope_lowpass: 500.0
+  n_fft: 4096
+  max_modulation_hz: 100.0

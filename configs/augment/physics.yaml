@@ -1,0 +1,39 @@
+name: physics
+family: physics
+ops:
+  - name: random_crop
+    prob: 1.0
+    params: {seconds: 30.0}
+  - name: lloyds_mirror
+    prob: 0.9
+    params:
+      source_depth_m: [2.0, 10.0]
+      receiver_depth_m: [10.0, 60.0]
+      range_m: [200.0, 6000.0]
+      sound_speed: 1500.0
+      reflection_coefficient: -1.0
+  - name: multipath
+    prob: 0.7
+    params:
+      n_arrivals: [2, 5]
+      delay_ms: [1.0, 40.0]
+      decay_db: [3.0, 18.0]
+  - name: transmission_loss
+    prob: 0.7
+    params:
+      range_m: [200.0, 6000.0]
+      spreading: cylindrical
+      absorption_model: thorp
+  - name: noise_mixing
+    prob: 0.7
+    params:
+      sources: [shipsear_class_e, wenz_synthetic]
+      snr_db: [0.0, 20.0]
+      sea_state: [1, 5]
+      holdout_only: true
+  - name: doppler
+    prob: 0.5
+    params: {rate: [0.98, 1.02]}
+  - name: time_mask
+    prob: 0.3
+    params: {max_fraction: 0.05, n_masks: 1}

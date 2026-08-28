@@ -1,0 +1,6 @@
+name: moco_physics
+_from_: configs/pretrain/moco_generic.yaml
+augment: {_from_: configs/augment/physics.yaml}
+wandb:
+  tags: [moco, physics]
+checkpoint_dir: checkpoints/moco_physics

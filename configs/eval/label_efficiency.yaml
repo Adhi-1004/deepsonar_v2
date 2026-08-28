@@ -1,0 +1,6 @@
+name: label_efficiency
+_from_: configs/eval/linear_probe.yaml
+protocol: label_efficiency
+label_fractions: [0.01, 0.05, 0.1, 0.25, 0.5, 1.0]
+wandb:
+  tags: [label_efficiency]
