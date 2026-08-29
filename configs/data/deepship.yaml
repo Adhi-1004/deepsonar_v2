@@ -1,0 +1,10 @@
+name: deepship
+source: kaggle:tangqiji/deepship-raw
+source_url: https://www.kaggle.com/datasets/tangqiji/deepship-raw
+root: data/raw/deepship
+sample_rate: 32000
+classes: [Cargo, Passengership, Tanker, Tug]
+split_safe: true
+recording_id: transit
+segment_seconds: 30.0
+hop_seconds: 15.0

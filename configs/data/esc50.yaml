@@ -1,0 +1,10 @@
+name: esc50
+source: kaggle:mmoreaux/environmental-sound-classification-50
+source_url: https://www.kaggle.com/datasets/mmoreaux/environmental-sound-classification-50
+root: data/raw/esc50
+sample_rate: 44100
+classes: [esc50]
+split_safe: true
+recording_id: fold
+segment_seconds: 5.0
+hop_seconds: 5.0

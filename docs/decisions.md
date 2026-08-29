@@ -554,3 +554,70 @@ log-Mel path only, or precomputing a bank of transfer functions and sampling fro
 Recording the honest position: the 13x batching speedup in D-018 is real and measured, but
 it was measured on a single magnitude-only op, and the full correct pipeline is
 substantially more expensive than that figure implies on its own.
+
+---
+
+## D-021 — Phase 5 negative result: the analytic channel does not approximate BELLHOP
+
+**Date:** 2026-08-28 · **Phase:** 5 · **Evidence:**
+`results/tables/physics_validation.json`, `results/figures/physics_validation.png`
+
+216 matched pairs, six per geometry across all 36, each rendered at its **actual** labelled
+range and receiver depth rather than a sampled one. Metric is log-spectral distance to the
+BELLHOP rendering; the untouched ShipsEar original is the baseline.
+
+| Variant | LSD dB | 10-100 Hz | 100-500 | 500-2k | 2k-8k | DEMON cos |
+|---|---|---|---|---|---|---|
+| **none (baseline)** | **6.348** | **6.874** | 6.449 | 6.199 | 6.283 | 0.894 |
+| lloyd | 9.786 | **17.483** | 9.218 | 9.142 | 9.597 | 0.879 |
+| tl | 6.525 | 6.764 | 6.891 | 6.375 | 6.436 | 0.891 |
+| lloyd+tl | 9.823 | 15.782 | 9.017 | 9.376 | 9.678 | 0.878 |
+| lloyd+tl+multipath | 10.420 | 15.533 | 9.801 | 9.996 | 10.312 | 0.869 |
+
+**Applying the analytic channel makes agreement worse, not better.** Lloyd's Mirror costs
+about **+3.4 dB**, and the damage is concentrated below 100 Hz where it adds **+10.6 dB**.
+The penalty is flat across receiver depth (+3.2 to +3.6 dB at every depth), so it is not a
+tuning problem. Transmission loss alone is roughly neutral (+0.18 dB). Multipath adds
+further error. No variant beats doing nothing.
+
+**Why, and it is not an implementation bug.** Lloyd's Mirror is a two-ray surface
+interference model: direct path plus surface image, valid for a near-surface receiver in
+shallow, effectively isovelocity water. DS3500 renders a **3500 m deep-sea** environment
+with a WOA18 sound-speed profile, and its own README says it models "direct and shadow
+zones". That regime is refraction-dominated — rays bend, shadow zones open, and the deep
+sound channel matters. A surface-image model has no way to represent any of it. The comb
+structure the implementation produces is correct (verified in
+`results/figures/augmentations.png`, notches at 1.9/3.7/5.6/7.4 kHz for the sampled
+geometry); it is the right filter for the wrong ocean.
+
+**The geometries do not overlap, which bounds what this test can say.**
+
+| | `configs/augment/physics.yaml` | DS3500 |
+|---|---|---|
+| receiver depth | 10-60 m | **100-1100 m** |
+| range | 200-6000 m | 1000-11000 m |
+
+The augmenter's configured receiver depth and DS3500's have **no overlap at all**. This test
+therefore measures the model far outside its intended envelope, and cannot speak to the
+shallow, near-surface regime it was written for. DS3500 offers no rendering there, so that
+regime remains unvalidated rather than validated.
+
+**What this does and does not invalidate.**
+
+- It **does** falsify the specific claim in `PLAN.md` §Phase 5 that "a computationally cheap
+  analytic channel model yields representations comparable to full ray-model simulation" —
+  at least for deep water. That sentence must come out of the abstract.
+- It **does not** touch the central label-efficiency claim. The augmentations do not need to
+  reproduce BELLHOP; they need to generate plausible channel variation so the encoder learns
+  invariance. Matching a specific simulator is a stronger property than the method requires.
+- DeepShip is recorded in the Strait of Georgia, coastal water of order 100-400 m — much
+  closer to Lloyd's Mirror's regime of validity than DS3500's 3500 m, though still deeper
+  than the config samples.
+
+**A caveat on the metric, stated so it is not discovered later.** Pointwise log-spectral
+distance at matched geometry asks whether the augmenter *reproduces* one rendering. The
+augmenter is stochastic and is meant to span a distribution of channels, so the fairer
+question is whether the BELLHOP rendering lies within the span of what it generates. That is
+a distributional test, not a distance, and it is not what `PLAN.md` asked for. The pointwise
+result above is clear enough that a distributional test is unlikely to reverse it, but it
+would be the more appropriate framing for a paper.

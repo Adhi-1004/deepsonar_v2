@@ -21,10 +21,13 @@ transmission-loss scaling, Doppler shift, and sea-state noise mixing — so that
 momentum-contrastive encoder is driven to discard channel-dependent nuisance variation
 while preserving source signatures such as propeller shaft- and blade-rate modulation. A
 DEMON-consistency regulariser explicitly protects these envelope-modulation cues from
-being destroyed by augmentation. We further validate the augmentation itself against
+being destroyed by augmentation. We further probe the augmentation itself against
 DS3500, a BELLHOP ray-theory rendering of ShipsEar across thirty-six simulated
-source-receiver geometries, showing that a computationally cheap analytic channel model
-yields representations comparable to full ray-model simulation. Pretraining on unlabelled
+source-receiver geometries, and report a negative result: the analytic two-ray channel
+diverges from full ray-model simulation in deep water, with the mismatch concentrated below
+100 Hz, which bounds the analytic model to the shallow, near-surface regime it was derived
+for. We argue this does not undermine the contrastive objective, which requires plausible
+channel variation rather than fidelity to any particular simulator. Pretraining on unlabelled
 ship recordings and evaluating on DeepShip and ShipsEar under recording-level splits that
 eliminate the recording-identity leakage recently shown to inflate results in this
 domain, we report label-efficiency curves from one to one hundred percent of labels
@@ -40,10 +43,10 @@ framework that defines self-supervised positive pairs by rendering the same clip
 independently sampled ocean channels — Lloyd's Mirror interference, multipath,
 transmission loss, and noise mixing — so a MoCo encoder learns propagation-invariant,
 ship-intrinsic features, with a DEMON-consistency term protecting propeller-modulation
-cues. Validated against BELLHOP ray-model renderings and evaluated on DeepShip and
-ShipsEar with leakage-free recording-level splits, PHASE improves label efficiency and
-reduces cross-dataset degradation, showing that embedding ocean physics into the
-contrastive objective yields data-efficient underwater acoustic target recognition.
+cues. Probed against BELLHOP ray-model renderings, which bound the analytic
+channel to shallow water, and evaluated on DeepShip and ShipsEar with leakage-free
+ship-level splits, PHASE is assessed for label efficiency and cross-dataset degradation
+against generic-augmentation contrastive and transfer baselines.
 
 ---
 
@@ -445,7 +448,7 @@ baselines; ablation table; cross-dataset matrix.
 | ~~DeepShip mirror unusable~~ | Resolved | Gate passed on `tangqiji/deepship-raw`, 47.22 h. D-007 |
 | SSL does not beat supervised at 100% labels | Phase 7 | Expected. Pivot narrative to label efficiency and cross-dataset robustness, where SSL usually still wins. Report honestly |
 | Representation collapse | Phase 6 monitors | Strengthen augmentation, raise queue size, lower temperature |
-| Physics augmenter diverges badly from BELLHOP | Phase 5 | Report the gap as a finding, add multipath arrivals, reduce claim scope to shallow-water regime |
+| ~~Physics augmenter diverges badly from BELLHOP~~ | **Occurred, Phase 5** | Reported as a finding in D-021. Claim scope reduced to shallow water; abstract rewritten. Multipath was tried and made agreement worse, not better |
 | Colab session limits | Any | Per-epoch checkpointing to Drive, resume-from-checkpoint in every training script |
 | Out of time | Week 10 | Minimum viable result: generic-vs-physics MoCo label-efficiency curve on DeepShip, recording-safe splits, three seeds. Everything else is optional |
 

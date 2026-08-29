@@ -4,59 +4,62 @@ Updated: 2026-08-28
 
 ## Current phase
 
-Phase 4 — Physics augmentation library. **Complete, awaiting review.**
+Phase 5 — Physics validation against BELLHOP. **Complete. The result is negative.**
 
 ## Done
 
-Phases 0-3 complete. Decisions D-001 to D-020 in `docs/decisions.md`.
+Phases 0-4 complete and audited. Decisions D-001 to D-021 in `docs/decisions.md`.
 
-**Phase 4.**
+**Phase 5.** `src/phase/eval/physics_validation.py` and `scripts/08_validate_physics.py`.
+216 matched pairs, six per geometry across all 36, each rendered at its **actual** labelled
+range and receiver depth rather than a sampled one.
 
-- `src/phase/augment/` — Lloyd's Mirror, multipath, transmission loss (Thorp absorption plus
-  spreading), noise mixing (Wenz sea-state model plus recorded ambient), Doppler, and the
-  generic baseline arm. All batched, device-agnostic torch.
-- `base.py` defines `SpectralAugmentation`, whose subclasses return a per-item frequency
-  response. `Pipeline` fuses consecutive spectral ops into **one** rFFT/irFFT pair.
-- `compose.py` draws the two independent views that become MoCo's positive pair.
-- `NoiseBank` enforces the D-011 contamination guard in code: it raises rather than serve a
-  ShipsEar clip outside the held-out list.
-- `notebooks/colab_eval.ipynb` — closes the outstanding Phase 3 criterion on a GPU, and
-  benchmarks augmentation cost.
+**The analytic channel model does not approximate BELLHOP. It makes agreement worse.**
 
-**The gate passes.** `tests/test_augment_preserves_demon.py` — 9 tests, no skips:
+| Variant | LSD to BELLHOP, dB | 10-100 Hz |
+|---|---|---|
+| none (baseline) | **6.348** | **6.874** |
+| lloyd | 9.786 | 17.483 |
+| tl | 6.525 | 6.764 |
+| lloyd+tl | 9.823 | 15.782 |
+| lloyd+tl+multipath | 10.420 | 15.533 |
 
-- the synthetic source carries the injected 6.2 Hz shaft and 24.8 Hz blade rates
-- each physics transform preserves both within 1.5 Hz
-- the full pipeline preserves both in **both** views
-- **negative control**: a heavy pitch shift *fails* the same check, so the test has power
-- forbidden augmentations cannot even be constructed
+Lloyd's Mirror costs about +3.4 dB overall and +10.6 dB below 100 Hz, flat across every
+receiver depth. Transmission loss is roughly neutral. See D-021 for why this is a modelling
+mismatch rather than a bug: Lloyd's Mirror is a shallow-water surface-interference model and
+DS3500 renders 3500 m deep water with a real sound-speed profile and shadow zones.
 
-`results/figures/augmentations.png` shows Lloyd's Mirror producing textbook comb notches at
-1.9, 3.7, 5.6 and 7.4 kHz, and the DEMON peak surviving every transform.
+**The two geometries do not overlap.** The augmenter samples receiver depths of 10-60 m;
+DS3500's shallowest is 100 m. This test measures extrapolation, so the shallow regime the
+model was written for is left **unvalidated, not validated**.
+
+Figure: `results/figures/physics_validation.png`.
 
 ## Blocked
 
-Nothing blocking Phase 5.
+Nothing blocked, but two things must be settled before Phase 6.
 
 ## Open — must close before Phase 6
 
-- **Augmentation cost is unverified on GPU (D-020).** The full pipeline is ~100-170 ms per
-  view-window on CPU, roughly 40 s per batch at 128. These are elementwise complex ops and a
-  GPU should transform that, but local torch is CPU-only so it is an expectation, not a
-  measurement. Section 8 of `colab_eval.ipynb` measures it.
-- **ESC-50 dry run has not converged.** Carried from Phase 3; the same notebook closes it.
-  Expected 60-80%; the run so far only reached 11.25% at 2 epochs on CPU.
-- **Nothing is pushed to GitHub.** The repo holds only the initial commit, so the Colab
-  notebook would clone an empty project.
+- **The Phase 5 result changes the paper's claims.** `PLAN.md` §0 states that a cheap
+  analytic model "yields representations comparable to full ray-model simulation". That
+  sentence is now falsified for deep water and has to be rewritten or dropped. The central
+  label-efficiency claim is untouched.
+- **ESC-50 dry run still has not converged** — one seed, 3 epochs, 32.25%. This is Phase 3's
+  last exit criterion. Run in a terminal, not backgrounded, roughly 2.5-3 h:
+  `.venv\Scripts\python.exe scripts/06_evaluate.py --cache data/cache/esc50_fold_0_logmel --seeds 0 1 2 --batch-size 16`
+- **Augmentation cost on a real training GPU (D-020).** Measured 33 ms per view-window on
+  the local MX450 against 142-166 ms on CPU. The 4.4x gain suggests memory-bandwidth bound,
+  so a T4 should be comfortably faster, but that remains an extrapolation.
+- **Nothing since commit `ba98799` is pushed.** The push failed: the stored credential is
+  for `Rodhiq` while the repository belongs to `Adhi-1004`.
 
 ## Last result
 
-`pytest` — **76 passed, 1 skipped** (only the intentional ShipsEar `split_safe: false`
-case). `ruff check` clean.
+`pytest` — 76 passed, 1 intentional skip. `ruff check` clean.
 
 ## Next
 
-Phase 5 — validate the analytic augmenter against BELLHOP. D-006 established 2,223 exact
-matched pairs across all 36 geometries, so this is a per-clip comparison at known range and
-depth: spectral distance, DEMON peak preservation, and embedding cosine similarity, reported
-by range and frequency band.
+Phase 6 — MoCo-v2 pretraining, once the ESC-50 gate closes and the claim wording is fixed.
+Three variants: `moco_generic`, `moco_physics`, `moco_physics_demon`. The generic arm is the
+direct ablation of the whole idea and must be tuned as carefully as the physics arm.

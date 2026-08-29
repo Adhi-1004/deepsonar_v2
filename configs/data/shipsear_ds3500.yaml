@@ -1,0 +1,10 @@
+name: shipsear_ds3500
+source: hf:peng7554/DS3500
+source_url: https://huggingface.co/datasets/peng7554/DS3500
+root: data/raw/ds3500
+sample_rate: 16000
+classes: ["0", "1", "2", "3", "4"]
+split_safe: false
+recording_id: none
+segment_seconds: 5.0
+hop_seconds: 5.0
