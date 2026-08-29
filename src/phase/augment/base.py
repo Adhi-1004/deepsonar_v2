@@ -36,9 +36,7 @@ class Augmentation:
 
         if self.prob >= 1.0:
             return transformed
-        keep = (
-            torch.rand(batch.shape[0], generator=generator, device=batch.device) < self.prob
-        ).unsqueeze(1)
+        keep = (draw(batch.shape[0], generator, batch.device) < self.prob).unsqueeze(1)
         return torch.where(keep, transformed, batch)
 
 
@@ -60,16 +58,29 @@ class SpectralAugmentation(Augmentation):
         return match_rms(apply_transfer(batch, response), batch)
 
 
+def draw(
+    shape: tuple[int, ...] | int, generator: torch.Generator, device: torch.device
+) -> torch.Tensor:
+    size = (shape,) if isinstance(shape, int) else shape
+    return torch.rand(size, generator=generator, device=generator.device).to(device)
+
+
+def draw_normal(
+    shape: tuple[int, ...], generator: torch.Generator, device: torch.device
+) -> torch.Tensor:
+    return torch.randn(shape, generator=generator, device=generator.device).to(device)
+
+
 def uniform(
     low: float, high: float, n: int, generator: torch.Generator, device: torch.device
 ) -> torch.Tensor:
-    return torch.rand(n, generator=generator, device=device) * (high - low) + low
+    return draw(n, generator, device) * (high - low) + low
 
 
 def log_uniform(
     low: float, high: float, n: int, generator: torch.Generator, device: torch.device
 ) -> torch.Tensor:
-    span = torch.rand(n, generator=generator, device=device)
+    span = draw(n, generator, device)
     return torch.exp(
         span * (torch.log(torch.tensor(high)) - torch.log(torch.tensor(low)))
         + torch.log(torch.tensor(low))
@@ -79,7 +90,9 @@ def log_uniform(
 def randint(
     low: int, high: int, n: int, generator: torch.Generator, device: torch.device
 ) -> torch.Tensor:
-    return torch.randint(low, high + 1, (n,), generator=generator, device=device)
+    return torch.randint(low, high + 1, (n,), generator=generator, device=generator.device).to(
+        device
+    )
 
 
 def pair(value: Any) -> tuple[float, float]:

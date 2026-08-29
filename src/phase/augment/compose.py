@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import torch
 
-from phase.augment.base import Augmentation, SpectralAugmentation, apply_transfer, match_rms
+from phase.augment.base import (
+    Augmentation,
+    SpectralAugmentation,
+    apply_transfer,
+    draw,
+    match_rms,
+)
 from phase.augment.doppler import Doppler
 from phase.augment.generic import Gain, GaussianNoise, PolarityFlip, RandomCrop, TimeMask
 from phase.augment.lloyds_mirror import LloydsMirror
@@ -65,9 +71,7 @@ class Pipeline:
             drawn = op.sample_params(n, sample_rate, generator, batch.device)
             response = op.response(length, sample_rate, drawn, batch.device).to(torch.complex64)
             if op.prob < 1.0:
-                keep = (
-                    torch.rand(n, generator=generator, device=batch.device) < op.prob
-                ).unsqueeze(1)
+                keep = (draw(n, generator, batch.device) < op.prob).unsqueeze(1)
                 response = torch.where(keep, response, torch.ones_like(response))
             combined = combined * response
 

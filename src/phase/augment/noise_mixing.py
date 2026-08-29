@@ -6,7 +6,16 @@ import numpy as np
 import soundfile as sf
 import torch
 
-from phase.augment.base import Augmentation, apply_transfer, frequencies, pair, rms, uniform
+from phase.augment.base import (
+    Augmentation,
+    apply_transfer,
+    draw,
+    draw_normal,
+    frequencies,
+    pair,
+    rms,
+    uniform,
+)
 from phase.data.manifest import resolve
 
 
@@ -90,7 +99,7 @@ class NoiseMixing(Augmentation):
         return {
             "snr_db": uniform(snr_low, snr_high, n, generator, device),
             "sea_state": uniform(state_low, state_high, n, generator, device),
-            "use_recorded": torch.rand(n, generator=generator, device=device),
+            "use_recorded": draw(n, generator, device),
         }
 
     def synthetic(
@@ -101,7 +110,7 @@ class NoiseMixing(Augmentation):
         sea_state: torch.Tensor,
         generator: torch.Generator,
     ) -> torch.Tensor:
-        white = torch.randn(n, length, generator=generator, device=sea_state.device)
+        white = draw_normal((n, length), generator, sea_state.device)
         freqs = frequencies(length, sample_rate, sea_state.device)
         level = wenz_spectrum(freqs, sea_state)
         response = torch.pow(10.0, (level - level.amax(dim=1, keepdim=True)) / 20.0)

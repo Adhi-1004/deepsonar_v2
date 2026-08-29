@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from phase.augment.base import Augmentation, pair, rms, uniform
+from phase.augment.base import Augmentation, draw, pair, rms, uniform
 
 
 class Gain(Augmentation):
@@ -37,8 +37,8 @@ class TimeMask(Augmentation):
         fraction = float(self.params.get("max_fraction", 0.1))
         count = int(self.params.get("n_masks", 2))
         return {
-            "width": torch.rand(n, count, generator=generator, device=device) * fraction,
-            "start": torch.rand(n, count, generator=generator, device=device),
+            "width": draw((n, count), generator, device) * fraction,
+            "start": draw((n, count), generator, device),
         }
 
     def transform(self, batch, sample_rate, drawn):

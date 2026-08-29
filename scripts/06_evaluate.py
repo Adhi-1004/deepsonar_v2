@@ -20,6 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache", required=True)
     parser.add_argument("--seeds", type=int, nargs="*", default=None)
     parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--wandb-mode", default="offline")
     parser.add_argument("--out", default="results/tables")
@@ -27,12 +28,13 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config(args.config, EvalConfig)
     optim = config.optim
-    if args.epochs:
-        overrides = {
-            **optim.__dict__,
-            "epochs": args.epochs,
-            "warmup_epochs": min(optim.warmup_epochs, max(0, args.epochs - 1)),
-        }
+    if args.epochs or args.batch_size:
+        overrides = dict(optim.__dict__)
+        if args.epochs:
+            overrides["epochs"] = args.epochs
+            overrides["warmup_epochs"] = min(optim.warmup_epochs, max(0, args.epochs - 1))
+        if args.batch_size:
+            overrides["batch_size"] = args.batch_size
         optim = type(optim)(**overrides)
 
     features, meta = cache.load(args.cache)
