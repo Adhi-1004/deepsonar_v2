@@ -4,7 +4,7 @@ Updated: 2026-08-28
 
 ## Current phase
 
-Phase 5 — Physics validation against BELLHOP. **Complete. The result is negative.**
+Phases 0-5 complete. **Phase 6 is unblocked.**
 
 ## Done
 
@@ -41,13 +41,12 @@ Nothing blocked, but two things must be settled before Phase 6.
 
 ## Open — must close before Phase 6
 
-- **The Phase 5 result changes the paper's claims.** `PLAN.md` §0 states that a cheap
-  analytic model "yields representations comparable to full ray-model simulation". That
-  sentence is now falsified for deep water and has to be rewritten or dropped. The central
-  label-efficiency claim is untouched.
-- **ESC-50 dry run still has not converged** — one seed, 3 epochs, 32.25%. This is Phase 3's
-  last exit criterion. Run in a terminal, not backgrounded, roughly 2.5-3 h:
-  `.venv\Scripts\python.exe scripts/06_evaluate.py --cache data/cache/esc50_fold_0_logmel --seeds 0 1 2 --batch-size 16`
+- ~~The Phase 5 result changes the paper's claims~~ **DONE.** The abstract in `PLAN.md` §0
+  now reports the negative result and bounds the analytic model to shallow water. The risk
+  table records that this risk occurred. The central label-efficiency claim is untouched.
+- ~~ESC-50 dry run~~ **CLOSED 2026-08-28.** 58.83% ± 0.76% accuracy, 57.04% ± 0.96%
+  macro-F1, three seeds on a Colab T4 — 29.4x the 2% chance level, above the 55% threshold
+  fixed in advance. Phase 3 is complete. See `docs/results_log.md`.
 - **Augmentation cost on a real training GPU (D-020).** Measured 33 ms per view-window on
   the local MX450 against 142-166 ms on CPU. The 4.4x gain suggests memory-bandwidth bound,
   so a T4 should be comfortably faster, but that remains an extrapolation.
@@ -60,6 +59,7 @@ Nothing blocked, but two things must be settled before Phase 6.
 
 ## Next
 
-Phase 6 — MoCo-v2 pretraining, once the ESC-50 gate closes and the claim wording is fixed.
+Phase 6 — MoCo-v2 pretraining. Both blockers are cleared: the ESC-50 gate passed and
+the abstract wording is corrected.
 Three variants: `moco_generic`, `moco_physics`, `moco_physics_demon`. The generic arm is the
 direct ablation of the whole idea and must be tuned as carefully as the physics arm.
