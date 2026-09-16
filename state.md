@@ -50,8 +50,8 @@ Nothing blocked, but two things must be settled before Phase 6.
 - **Augmentation cost on a real training GPU (D-020).** Measured 33 ms per view-window on
   the local MX450 against 142-166 ms on CPU. The 4.4x gain suggests memory-bandwidth bound,
   so a T4 should be comfortably faster, but that remains an extrapolation.
-- **Nothing since commit `ba98799` is pushed.** The push failed: the stored credential is
-  for `Rodhiq` while the repository belongs to `Adhi-1004`.
+- ~~**Nothing since commit `ba98799` is pushed.** The push failed: the stored credential is
+  for `Rodhiq` while the repository belongs to `Adhi-1004`.~~ **DONE.**
 
 ## Last result
 
