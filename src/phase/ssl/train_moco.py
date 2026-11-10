@@ -101,6 +101,7 @@ class Trainer:
                 config.demon_loss, config.moco.dim, config.data.sample_rate, frame
             ).to(self.device)
             parameters += list(self.demon.parameters())
+        self.parameters = parameters
 
         optim = config.optim
         if optim.optimizer == "adamw":
@@ -120,9 +121,12 @@ class Trainer:
         return self.pipeline.views(waveform, self.config.data.sample_rate, self.generator)
 
     def step(self, waveform: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+        wave_q, wave_k = self.views(waveform.float())
+        feat_q = self.frontend(wave_q)
+        feat_k = self.frontend(wave_k)
+
         with autocast_context(enabled=self.amp, device_type=self.device.type):
-            wave_q, wave_k = self.views(waveform)
-            logits, labels, query, key = self.model(self.frontend(wave_q), self.frontend(wave_k))
+            logits, labels, query, key = self.model(feat_q, feat_k)
 
             loss = info_nce(logits, labels)
             stats = {"info_nce": float(loss.detach())}
@@ -143,9 +147,10 @@ class Trainer:
         embeddings, labels = [], []
         seen = 0
         for waveform, label in loader:
-            waveform = waveform.to(self.device, non_blocking=True)
+            waveform = waveform.to(self.device, non_blocking=True).float()
+            feat = self.frontend(waveform)
             with autocast_context(enabled=self.amp, device_type=self.device.type):
-                embed = self.model.embed(self.frontend(waveform))
+                embed = self.model.embed(feat)
             embeddings.append(embed.float().cpu())
             labels.append(label)
             seen += label.shape[0]
@@ -190,10 +195,13 @@ class Trainer:
                 self.optimiser.zero_grad(set_to_none=True)
                 if self.amp:
                     self.scaler.scale(loss).backward()
+                    self.scaler.unscale_(self.optimiser)
+                    torch.nn.utils.clip_grad_norm_(self.parameters, max_norm=5.0)
                     self.scaler.step(self.optimiser)
                     self.scaler.update()
                 else:
                     loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.parameters, max_norm=5.0)
                     self.optimiser.step()
 
                 for key, value in stats.items():
@@ -205,10 +213,12 @@ class Trainer:
 
             with torch.no_grad():
                 waveform, _ = next(iter(self.loader))
+                wave_q, wave_k = self.views(waveform.to(self.device).float())
+                feat_q = self.frontend(wave_q)
+                feat_k = self.frontend(wave_k)
                 with autocast_context(enabled=self.amp, device_type=self.device.type):
-                    wave_q, wave_k = self.views(waveform.to(self.device))
-                    query = self.model.encoder_q(self.frontend(wave_q))
-                    key = self.model.encoder_k(self.frontend(wave_k))
+                    query = self.model.encoder_q(feat_q)
+                    key = self.model.encoder_k(feat_k)
                 record.update(health(query.float(), key.float()))
 
             if (epoch + 1) % monitor_every == 0 or epoch == total - 1:

@@ -15,23 +15,19 @@ def collapse_statistics(embeddings: torch.Tensor) -> dict[str, float]:
     smaller than its nominal width, which is the subtler failure and the one a
     k-NN probe can still look healthy through.
     """
-    centred = (embeddings - embeddings.mean(dim=0, keepdim=True)).float()
+    centred = (embeddings - embeddings.mean(dim=0, keepdim=True)).float().cpu()
     per_dimension = centred.std(dim=0)
 
     try:
         singular_values = torch.linalg.svdvals(centred)
         eigenvalues = singular_values.pow(2) / max(1, centred.shape[0] - 1)
     except Exception:
-        try:
-            singular_values = torch.linalg.svdvals(centred.cpu())
-            eigenvalues = singular_values.pow(2) / max(1, centred.shape[0] - 1)
-        except Exception:
-            return {
-                "embedding_std": float(per_dimension.mean().item()),
-                "embedding_std_min": float(per_dimension.min().item()),
-                "effective_rank": float(embeddings.shape[1]),
-                "rank_fraction": 1.0,
-            }
+        return {
+            "embedding_std": float(per_dimension.mean().item()),
+            "embedding_std_min": float(per_dimension.min().item()),
+            "effective_rank": float(embeddings.shape[1]),
+            "rank_fraction": 1.0,
+        }
 
     eigenvalues = eigenvalues.clamp_min(0)
     total = eigenvalues.sum()
