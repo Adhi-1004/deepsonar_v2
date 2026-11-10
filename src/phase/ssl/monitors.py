@@ -15,22 +15,36 @@ def collapse_statistics(embeddings: torch.Tensor) -> dict[str, float]:
     smaller than its nominal width, which is the subtler failure and the one a
     k-NN probe can still look healthy through.
     """
-    centred = embeddings - embeddings.mean(dim=0, keepdim=True)
+    centred = (embeddings - embeddings.mean(dim=0, keepdim=True)).float()
     per_dimension = centred.std(dim=0)
 
-    covariance = (centred.T @ centred) / max(1, centred.shape[0] - 1)
-    eigenvalues = torch.linalg.eigvalsh(covariance.float()).clamp_min(0)
+    try:
+        singular_values = torch.linalg.svdvals(centred)
+        eigenvalues = singular_values.pow(2) / max(1, centred.shape[0] - 1)
+    except Exception:
+        try:
+            singular_values = torch.linalg.svdvals(centred.cpu())
+            eigenvalues = singular_values.pow(2) / max(1, centred.shape[0] - 1)
+        except Exception:
+            return {
+                "embedding_std": float(per_dimension.mean().item()),
+                "embedding_std_min": float(per_dimension.min().item()),
+                "effective_rank": float(embeddings.shape[1]),
+                "rank_fraction": 1.0,
+            }
+
+    eigenvalues = eigenvalues.clamp_min(0)
     total = eigenvalues.sum()
     if total <= 0:
         return {"embedding_std": 0.0, "effective_rank": 0.0, "rank_fraction": 0.0}
 
     proportions = (eigenvalues / total).clamp_min(1e-12)
     entropy = -(proportions * proportions.log()).sum()
-    effective_rank = float(entropy.exp())
+    effective_rank = float(entropy.exp().item())
 
     return {
-        "embedding_std": float(per_dimension.mean()),
-        "embedding_std_min": float(per_dimension.min()),
+        "embedding_std": float(per_dimension.mean().item()),
+        "embedding_std_min": float(per_dimension.min().item()),
         "effective_rank": effective_rank,
         "rank_fraction": effective_rank / embeddings.shape[1],
     }

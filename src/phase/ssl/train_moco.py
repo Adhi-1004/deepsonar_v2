@@ -28,6 +28,20 @@ def cosine_lr(epoch: int, total: int, warmup: int, base: float) -> float:
     return base * 0.5 * (1 + math.cos(math.pi * progress))
 
 
+def make_scaler(enabled: bool, device_type: str = "cuda"):
+    try:
+        return torch.amp.GradScaler(device_type, enabled=enabled)
+    except (TypeError, AttributeError):
+        return torch.cuda.amp.GradScaler(enabled=enabled)
+
+
+def autocast_context(enabled: bool, device_type: str = "cuda"):
+    try:
+        return torch.amp.autocast(device_type, enabled=enabled)
+    except (TypeError, AttributeError):
+        return torch.cuda.amp.autocast(enabled=enabled)
+
+
 def build_loaders(
     config: PretrainConfig, index_path: str | Path, root: str | Path, workers: int
 ) -> tuple[DataLoader, DataLoader | None, list[str]]:
@@ -72,7 +86,7 @@ class Trainer:
         self.config = config
         self.device = torch.device(device)
         self.amp = amp and (self.device.type == "cuda")
-        self.scaler = torch.cuda.amp.GradScaler(enabled=self.amp)
+        self.scaler = make_scaler(enabled=self.amp, device_type=self.device.type)
 
         self.loader, self.probe, self.classes = build_loaders(config, index_path, root, workers)
         self.frontend = LogMelFrontEnd(config.features, config.data.sample_rate).to(self.device)
@@ -106,7 +120,7 @@ class Trainer:
         return self.pipeline.views(waveform, self.config.data.sample_rate, self.generator)
 
     def step(self, waveform: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
-        with torch.cuda.amp.autocast(enabled=self.amp):
+        with autocast_context(enabled=self.amp, device_type=self.device.type):
             wave_q, wave_k = self.views(waveform)
             logits, labels, query, key = self.model(self.frontend(wave_q), self.frontend(wave_k))
 
@@ -130,7 +144,7 @@ class Trainer:
         seen = 0
         for waveform, label in loader:
             waveform = waveform.to(self.device, non_blocking=True)
-            with torch.cuda.amp.autocast(enabled=self.amp):
+            with autocast_context(enabled=self.amp, device_type=self.device.type):
                 embed = self.model.embed(self.frontend(waveform))
             embeddings.append(embed.float().cpu())
             labels.append(label)
@@ -191,7 +205,7 @@ class Trainer:
 
             with torch.no_grad():
                 waveform, _ = next(iter(self.loader))
-                with torch.cuda.amp.autocast(enabled=self.amp):
+                with autocast_context(enabled=self.amp, device_type=self.device.type):
                     wave_q, wave_k = self.views(waveform.to(self.device))
                     query = self.model.encoder_q(self.frontend(wave_q))
                     key = self.model.encoder_k(self.frontend(wave_k))
