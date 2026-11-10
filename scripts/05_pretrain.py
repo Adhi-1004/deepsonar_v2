@@ -23,6 +23,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--wandb-mode", default="offline")
+    parser.add_argument("--amp", action="store_true", default=True)
+    parser.add_argument("--no-amp", action="store_false", dest="amp")
+    parser.add_argument("--monitor-every", type=int, default=5)
+    parser.add_argument("--monitor-limit", type=int, default=512)
     args = parser.parse_args(argv)
 
     config = load_config(args.config, PretrainConfig)
@@ -39,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         device=args.device,
         workers=args.workers,
         noise_bank=bank,
+        amp=args.amp,
     )
     print(
         f"{config.name} | {len(trainer.loader.dataset)} train windows | augment {config.augment.name}"
@@ -60,7 +65,12 @@ def main(argv: list[str] | None = None) -> int:
         job_type="pretrain",
     )
     try:
-        history = trainer.train(epochs=args.epochs, log=lambda record: run.log(record))
+        history = trainer.train(
+            epochs=args.epochs,
+            log=lambda record: run.log(record),
+            monitor_every=args.monitor_every,
+            monitor_limit=args.monitor_limit,
+        )
     finally:
         finish_run(run)
 

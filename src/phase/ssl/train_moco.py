@@ -67,9 +67,12 @@ class Trainer:
         device: str = "cuda",
         workers: int = 2,
         noise_bank: NoiseBank | None = None,
+        amp: bool = True,
     ):
         self.config = config
         self.device = torch.device(device)
+        self.amp = amp and (self.device.type == "cuda")
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.amp)
 
         self.loader, self.probe, self.classes = build_loaders(config, index_path, root, workers)
         self.frontend = LogMelFrontEnd(config.features, config.data.sample_rate).to(self.device)
@@ -103,16 +106,17 @@ class Trainer:
         return self.pipeline.views(waveform, self.config.data.sample_rate, self.generator)
 
     def step(self, waveform: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
-        wave_q, wave_k = self.views(waveform)
-        logits, labels, query, key = self.model(self.frontend(wave_q), self.frontend(wave_k))
+        with torch.cuda.amp.autocast(enabled=self.amp):
+            wave_q, wave_k = self.views(waveform)
+            logits, labels, query, key = self.model(self.frontend(wave_q), self.frontend(wave_k))
 
-        loss = info_nce(logits, labels)
-        stats = {"info_nce": float(loss.detach())}
+            loss = info_nce(logits, labels)
+            stats = {"info_nce": float(loss.detach())}
 
-        if self.demon is not None:
-            auxiliary, demon_stats = self.demon(query, key, wave_q, wave_k)
-            loss = loss + auxiliary
-            stats.update(demon_stats)
+            if self.demon is not None:
+                auxiliary, demon_stats = self.demon(query, key, wave_q, wave_k)
+                loss = loss + auxiliary
+                stats.update(demon_stats)
 
         self.model.enqueue(key)
         stats["loss"] = float(loss.detach())
@@ -120,13 +124,15 @@ class Trainer:
         return loss, stats
 
     @torch.no_grad()
-    def embed_split(self, loader: DataLoader, limit: int = 2048):
+    def embed_split(self, loader: DataLoader, limit: int = 512):
         self.model.eval()
         embeddings, labels = [], []
         seen = 0
         for waveform, label in loader:
             waveform = waveform.to(self.device, non_blocking=True)
-            embeddings.append(self.model.embed(self.frontend(waveform)).cpu())
+            with torch.cuda.amp.autocast(enabled=self.amp):
+                embed = self.model.embed(self.frontend(waveform))
+            embeddings.append(embed.float().cpu())
             labels.append(label)
             seen += label.shape[0]
             if seen >= limit:
@@ -136,15 +142,21 @@ class Trainer:
             return torch.empty(0), torch.empty(0, dtype=torch.long)
         return torch.cat(embeddings), torch.cat(labels)
 
-    def monitor(self) -> dict[str, float]:
+    def monitor(self, limit: int = 512) -> dict[str, float]:
         if self.probe is None:
             return {}
-        train_embeddings, train_labels = self.embed_split(self.loader)
-        probe_embeddings, probe_labels = self.embed_split(self.probe)
+        train_embeddings, train_labels = self.embed_split(self.loader, limit=limit)
+        probe_embeddings, probe_labels = self.embed_split(self.probe, limit=limit)
         accuracy = knn_accuracy(train_embeddings, train_labels, probe_embeddings, probe_labels)
         return {"knn_accuracy": accuracy}
 
-    def train(self, epochs: int | None = None, log: Any = None) -> list[dict[str, Any]]:
+    def train(
+        self,
+        epochs: int | None = None,
+        log: Any = None,
+        monitor_every: int = 5,
+        monitor_limit: int = 512,
+    ) -> list[dict[str, Any]]:
         optim = self.config.optim
         total = epochs or optim.epochs
         chance = 1.0 / max(1, len(self.classes))
@@ -162,8 +174,13 @@ class Trainer:
                 loss, stats = self.step(waveform)
 
                 self.optimiser.zero_grad(set_to_none=True)
-                loss.backward()
-                self.optimiser.step()
+                if self.amp:
+                    self.scaler.scale(loss).backward()
+                    self.scaler.step(self.optimiser)
+                    self.scaler.update()
+                else:
+                    loss.backward()
+                    self.optimiser.step()
 
                 for key, value in stats.items():
                     running[key] = running.get(key, 0.0) + value
@@ -174,12 +191,19 @@ class Trainer:
 
             with torch.no_grad():
                 waveform, _ = next(iter(self.loader))
-                wave_q, wave_k = self.views(waveform.to(self.device))
-                query = self.model.encoder_q(self.frontend(wave_q))
-                key = self.model.encoder_k(self.frontend(wave_k))
-                record.update(health(query, key))
+                with torch.cuda.amp.autocast(enabled=self.amp):
+                    wave_q, wave_k = self.views(waveform.to(self.device))
+                    query = self.model.encoder_q(self.frontend(wave_q))
+                    key = self.model.encoder_k(self.frontend(wave_k))
+                record.update(health(query.float(), key.float()))
 
-            record.update(self.monitor())
+            if (epoch + 1) % monitor_every == 0 or epoch == total - 1:
+                record.update(self.monitor(limit=monitor_limit))
+            elif self.history:
+                last_knn = self.history[-1].get("knn_accuracy", float("nan"))
+                if not math.isnan(last_knn):
+                    record["knn_accuracy"] = last_knn
+
             record["collapsed"] = is_collapsed(
                 record, record.get("knn_accuracy", float("nan")), chance
             )

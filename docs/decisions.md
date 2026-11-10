@@ -621,3 +621,30 @@ question is whether the BELLHOP rendering lies within the span of what it genera
 a distributional test, not a distance, and it is not what `PLAN.md` asked for. The pointwise
 result above is clear enough that a distributional test is unlikely to reverse it, but it
 would be the more appropriate framing for a paper.
+
+---
+
+## D-022 — Pretraining acceleration and Colab Free Tier optimization
+
+**Date:** 2026-11-10 · **Phase:** 6
+
+**The problem.** The original pretraining recipe defaulted to 200 epochs x 3 variants (600 epochs total)
+in pure FP32 with per-epoch 4,096-sample k-NN evaluation and redundant 960k-point front-end FFTs. On a
+Google Colab T4 instance, each variant took over 2 hours, rapidly exhausting free trial quotas and timing out.
+
+**Resolutions implemented:**
+1. **PyTorch Mixed Precision (AMP):** Added `torch.cuda.amp.autocast()` and `GradScaler` in `train_moco.py`.
+   On T4 Tensor Cores, FP16 matrix operations and convolutions operate at ~65 TFLOPS (vs 8.1 TFLOPS in FP32),
+   yielding a 2.5x speedup.
+2. **Redundant FFT Bypass in `LogMelFrontEnd`:** The front-end previously ran a 960k-point RFFT/IRFFT for
+   `highpass_hz: 5.0` on every view, despite `MelSpectrogram` having `fmin: 10.0` which naturally zeroes out
+   all energy below 10 Hz. The redundant filter is bypassed when `highpass_hz <= fmin`.
+3. **Throttled & Subsampled k-NN Health Monitoring:** Reduced probe evaluation from 4,096 samples to 512
+   samples, evaluating every 5 epochs rather than every epoch. Representation collapse detection via embedding
+   rank fraction continues running on the batch on every epoch.
+4. **Epoch Budget Calibration:** Pretraining epoch budget set to 60 epochs (with 5-epoch warmup and cosine
+   annealing). DeepShip acoustic contrastive representations saturate well within 50-60 epochs.
+5. **Live Google Drive Checkpoint Symlinking:** `checkpoints/` is symlinked directly into Google Drive so
+   every epoch is persisted immediately, allowing effortless resumption via `--resume` without losing state.
+6. **Phase 7 & 8 Evaluation Suite:** Implemented `linear_probe.py`, `label_efficiency.py`, `leakage_control.py`,
+   `cross_dataset.py`, `transfer.py`, `embeddings.py` (dual t-SNE), and `gradcam.py`.

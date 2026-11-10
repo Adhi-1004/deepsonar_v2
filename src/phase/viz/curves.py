@@ -73,3 +73,47 @@ def physics_validation(payload: dict[str, Any], out: str | Path) -> Path:
     fig.savefig(target, dpi=130)
     plt.close(fig)
     return target
+
+
+def label_efficiency_curve(
+    results_by_method: dict[str, dict[str, Any]],
+    out: str | Path,
+    metric: str = "macro_f1",
+) -> Path:
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    palette = {
+        "moco_physics": "#2E7089",
+        "moco_physics_demon": "#3D6E53",
+        "moco_generic": "#B85F18",
+        "supervised": "#A8362D",
+        "imagenet": "#63757F",
+    }
+
+    for method, data in results_by_method.items():
+        color = palette.get(method, "#333333")
+        fractions = [float(f) * 100 for f in data["fractions"]]
+        means = [data["results"][str(f)]["summary"][metric]["mean"] for f in data["fractions"]]
+        stds = [data["results"][str(f)]["summary"][metric]["std"] for f in data["fractions"]]
+
+        means_arr = np.array(means)
+        stds_arr = np.array(stds)
+
+        ax.plot(fractions, means_arr, "o-", label=method, color=color, linewidth=2)
+        ax.fill_between(fractions, means_arr - stds_arr, means_arr + stds_arr, color=color, alpha=0.15)
+
+    ax.set_xscale("log")
+    ax.set_xticks([1, 5, 10, 25, 50, 100])
+    ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    ax.set_xlabel("Labelled Data Fraction (%)")
+    ax.set_ylabel(metric.replace("_", " ").upper())
+    ax.set_title("Label Efficiency: Physics-Augmented vs Generic Baselines")
+    ax.legend(frameon=True, fontsize=9)
+    ax.grid(alpha=0.3, which="both", linestyle="--")
+
+    fig.tight_layout()
+    target = resolve(out)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(target, dpi=150)
+    plt.close(fig)
+    return target
