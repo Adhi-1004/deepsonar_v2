@@ -1,0 +1,8 @@
+name: cross_dataset
+_from_: configs/eval/linear_probe.yaml
+protocol: cross_dataset
+# train on DeepShip, test on ShipsEar
+transfer_data: {_from_: configs/data/shipsear_ds3500.yaml}
+wandb:
+  tags: [cross_dataset]
+

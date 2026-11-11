@@ -1,14 +1,45 @@
 # PHASE — state
 
-Updated: 2026-08-28
+Updated: 2026-11-11
 
 ## Current phase
 
-Phases 0-5 complete. **Phase 6 is unblocked.**
+Phases 0–5 complete. Phase 6 scaffold complete (Trainer + all SSL code
+in place). **Phases 7–8 code complete — ready to run once Phase 6
+checkpoints exist.**
 
 ## Done
 
-Phases 0-4 complete and audited. Decisions D-001 to D-021 in `docs/decisions.md`.
+Phases 0–5 complete and audited. Decisions D-001 to D-021 in `docs/decisions.md`.
+
+**Phase 6 (code).** `src/phase/ssl/train_moco.py` Trainer, `src/phase/ssl/losses.py`,
+`src/phase/ssl/demon_consistency.py`, `src/phase/ssl/monitors.py`, `scripts/05_pretrain.py`
+all implemented and passing tests. Awaiting actual training run on GPU.
+
+**Phase 7 (code).** All evaluation modules written and passing the full test suite
+(76 passed, 1 skip):
+- `src/phase/eval/linear_probe.py` — frozen-encoder linear head, label-fraction sub-sampling
+  grouped by recording_id, cosine LR, val-best checkpoint.
+- `src/phase/eval/label_efficiency.py` — sweep over `label_fractions` × `seeds`, aggregate
+  summary with mean ± std per fraction, `render_table()` for console output.
+- `src/phase/eval/cross_dataset.py` — train on source splits, evaluate on entire target
+  dataset; multi-seed sweep; writes `target_summary` and `source_summary`.
+- `src/phase/eval/leakage_control.py` — within-class permutation of `recording_ids`;
+  compares real grouped split vs shuffled; Δ table shows how much grouping helps.
+- `src/phase/data/__init__.py` — `load()`/`save()` helpers for `.npz` feature cache.
+- `scripts/09_linear_probe.py` — CLI wrapping all four protocols; `--label-efficiency`,
+  `--cross-dataset`, `--leakage-control` flags.
+
+**Phase 8 (code).** Interpretability and figure generation:
+- `src/phase/viz/embeddings.py` — `extract_embeddings()`, t-SNE / UMAP dual scatter
+  (class + recording), `per_class_uniformity()`.
+- `src/phase/viz/gradcam.py` — `GradCAM` hook-based class, `gradcam_panel()` grid figure.
+- `src/phase/viz/curves.py` — `label_efficiency_curve()`, `training_monitor_curves()`,
+  `confusion_matrix_figure()`, `cross_dataset_bar()`; consistent colour palette.
+- `src/phase/models/transfer.py` — `TransferEncoder` for ImageNet ResNet and AudioSet PANN,
+  with graceful fallback if timm weights unavailable.
+- `scripts/10_make_figures_phase8.py` — one command for all Phase 8 figures.
+- `configs/eval/cross_dataset.yaml` added.
 
 **Phase 5.** `src/phase/eval/physics_validation.py` and `scripts/08_validate_physics.py`.
 216 matched pairs, six per geometry across all 36, each rendered at its **actual** labelled
