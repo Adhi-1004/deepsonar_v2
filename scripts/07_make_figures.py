@@ -70,10 +70,67 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report", default="data/manifests/deepship_clean_report.json")
     parser.add_argument("--out", default="results/figures")
     parser.add_argument("--augmentations", action="store_true")
+    parser.add_argument("--label-efficiency", action="store_true")
+    parser.add_argument("--embeddings", action="store_true")
+    parser.add_argument("--gradcam", action="store_true")
+    parser.add_argument("--cache", default="data/cache/deepship_fold_0_logmel")
+    parser.add_argument("--checkpoint", default=None)
     args = parser.parse_args(argv)
 
     if args.augmentations:
         return render_augmentations(args)
+
+    if args.label_efficiency:
+        from phase.viz.curves import label_efficiency_curve
+
+        results_dir = resolve("results/tables")
+        results = {}
+        for file in sorted(results_dir.glob("label_efficiency_*.json")):
+            name = file.stem.replace("label_efficiency_", "").split("_")[0]
+            results[name] = json.loads(file.read_text(encoding="utf-8"))
+        if results:
+            out_img = label_efficiency_curve(results, f"{args.out}/label_efficiency.png")
+            print(f"wrote {out_img.relative_to(REPO_ROOT).as_posix()}")
+        else:
+            print("no label efficiency result files found in results/tables/")
+        return 0
+
+    if args.embeddings:
+        from phase.data import cache
+        from phase.eval.linear_probe import extract_embeddings
+        from phase.models.transfer import load_classifier
+        from phase.viz.embeddings import plot_embeddings_dual
+
+        features, meta = cache.load(args.cache)
+        model = load_classifier("resnet18", len(set(meta["labels"])), checkpoint_path=args.checkpoint)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device)
+
+        from torch.utils.data import DataLoader, TensorDataset
+        loader = DataLoader(TensorDataset(torch.from_numpy(features[:1000]).float(), torch.zeros(1000)), batch_size=128)
+        embs, _ = extract_embeddings(model.backbone, loader, device)
+        out_img = plot_embeddings_dual(
+            embs.numpy(),
+            meta["labels"][:1000],
+            meta["recording_ids"][:1000],
+            f"{args.out}/embeddings_tsne.png",
+        )
+        print(f"wrote {out_img.relative_to(REPO_ROOT).as_posix()}")
+        return 0
+
+    if args.gradcam:
+        from phase.data import cache
+        from phase.models.transfer import load_classifier
+        from phase.viz.gradcam import GradCAM, plot_gradcam
+
+        features, meta = cache.load(args.cache)
+        model = load_classifier("resnet18", len(set(meta["labels"])), checkpoint_path=args.checkpoint)
+        cam = GradCAM(model, model.backbone.layer4)
+        sample = torch.from_numpy(features[0]).float()
+        heatmap = cam.generate(sample)
+        out_img = plot_gradcam(features[0], heatmap, f"{args.out}/gradcam.png")
+        print(f"wrote {out_img.relative_to(REPO_ROOT).as_posix()}")
+        return 0
 
     report = json.loads(resolve(args.report).read_text(encoding="utf-8"))
     worst = max(report["rows"], key=lambda r: r["low_freq_fraction"])

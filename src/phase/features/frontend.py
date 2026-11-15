@@ -35,7 +35,7 @@ class LogMelFrontEnd(nn.Module):
         )
 
     def forward(self, waveform: torch.Tensor) -> torch.Tensor:
-        if self.highpass_hz > 0:
+        if self.highpass_hz > 0 and self.highpass_hz > self.mel.f_min:
             spectrum = torch.fft.rfft(waveform, dim=-1)
             freqs = torch.fft.rfftfreq(
                 waveform.shape[-1], 1.0 / self.sample_rate, device=waveform.device
